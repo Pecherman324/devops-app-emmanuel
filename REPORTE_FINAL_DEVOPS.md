@@ -2,7 +2,7 @@
 
 **Alumno:** Emmanuel Rodríguez Valdés  
 **Materia:** Herramientas de Automatización en DevOps  
-**Profesor:** Dr. [Nombre del Profesor]  
+**Profesor:** Dr. Froylan Alonso Pérez  
 **Fecha:** 2 de Octubre de 2025  
 
 ---
@@ -78,7 +78,7 @@ def index():
 def api_info():
     return jsonify({
         'materia': 'Herramientas de Automatización en DevOps',
-        'profesor': 'Dr. [Nombre del Profesor]',
+        'profesor': 'Dr. Froylan Alonso Pérez',
         'alumno': 'Emmanuel Rodríguez Valdés',
         'fecha': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'version': '1.0.0',

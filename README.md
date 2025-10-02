@@ -7,7 +7,7 @@ Este proyecto implementa una aplicación web Flask con un pipeline completo de D
 ## Información del Proyecto
 
 - **Materia**: Herramientas de Automatización en DevOps
-- **Profesor**: Dr. [Nombre del Profesor]
+- **Profesor**: Dr. Froylan Alonso Pérez
 - **Alumno**: Emmanuel Rodríguez Valdés
 - **Versión**: 1.0.0
 - **Fecha**: 2025-10-02
@@ -119,7 +119,7 @@ Respuesta:
 ```json
 {
   "materia": "Herramientas de Automatización en DevOps",
-  "profesor": "Dr. [Nombre del Profesor]",
+  "profesor": "Dr. Froylan Alonso Pérez",
   "alumno": "Emmanuel Rodríguez Valdés",
   "fecha": "2025-10-02 03:37:30",
   "version": "1.0.0",
@@ -284,6 +284,6 @@ Este proyecto es parte de un trabajo académico para la materia "Herramientas de
 
 ## Agradecimientos
 
-- Dr. [Nombre del Profesor] por la guía y enseñanza
+- Dr. Froylan Alonso Pérez por la guía y enseñanza
 - Comunidad de DevOps por las mejores prácticas
 - Herramientas open source utilizadas en el proyecto
