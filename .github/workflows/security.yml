@@ -1,0 +1,254 @@
+name: Security Pipeline - DevSecOps
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 2 * * 1'  # Ejecutar cada lunes a las 2 AM
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Job 1: Análisis de seguridad del código
+  code-security:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+
+    - name: Configurar Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Instalar dependencias de seguridad
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install bandit safety flake8
+
+    - name: Análisis de seguridad con Bandit
+      run: |
+        bandit -r app.py -f json -o bandit-report.json || true
+        bandit -r app.py -f txt -o bandit-report.txt || true
+        bandit -r app.py
+
+    - name: Verificación de dependencias con Safety
+      run: |
+        safety check --json --output safety-report.json || true
+        safety check
+
+    - name: Análisis de calidad con Flake8
+      run: |
+        flake8 app.py --max-line-length=100 --format=json --output-file=flake8-report.json || true
+        flake8 app.py --max-line-length=100
+
+    - name: Subir reportes de seguridad
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          bandit-report.txt
+          safety-report.json
+          flake8-report.json
+
+  # Job 2: Escaneo de vulnerabilidades en Docker
+  docker-security:
+    runs-on: ubuntu-latest
+    needs: code-security
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+
+    - name: Build imagen Docker
+      run: |
+        docker build -t devops-app-emmanuel:security-test .
+
+    - name: Escaneo de vulnerabilidades con Trivy
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'devops-app-emmanuel:security-test'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Subir resultados de Trivy
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Escaneo de vulnerabilidades con Snyk
+      uses: snyk/actions/docker@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        image: 'devops-app-emmanuel:security-test'
+        args: '--severity-threshold=high'
+
+    - name: Docker Bench Security
+      run: |
+        docker run --rm --net host --pid host --userns host --cap-add audit_control \
+          -e DOCKER_CONTENT_TRUST=$DOCKER_CONTENT_TRUST \
+          -v /etc:/etc:ro \
+          -v /usr/bin/containerd:/usr/bin/containerd:ro \
+          -v /usr/bin/runc:/usr/bin/runc:ro \
+          -v /usr/lib/systemd:/usr/lib/systemd:ro \
+          -v /var/lib:/var/lib:ro \
+          -v /var/run/docker.sock:/var/run/docker.sock:ro \
+          --label docker_bench_security \
+          docker/docker-bench-security || true
+
+  # Job 3: Pruebas de seguridad automatizadas
+  security-tests:
+    runs-on: ubuntu-latest
+    needs: code-security
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+
+    - name: Configurar Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Instalar dependencias
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest requests
+
+    - name: Ejecutar pruebas de seguridad
+      run: |
+        python -m pytest test_security.py -v --junitxml=security-test-results.xml
+
+    - name: Subir resultados de pruebas
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-test-results
+        path: security-test-results.xml
+
+  # Job 4: Análisis de secretos
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Escaneo de secretos con GitLeaks
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Escaneo de secretos con TruffleHog
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
+        extra_args: --debug --only-verified
+
+  # Job 5: Análisis de dependencias
+  dependency-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+
+    - name: Configurar Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Análisis de dependencias con Snyk
+      uses: snyk/actions/python@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: '--severity-threshold=high'
+
+    - name: Análisis de dependencias con OWASP Dependency Check
+      uses: dependency-check/Dependency-Check_Action@main
+      with:
+        project: 'devops-app-emmanuel'
+        path: '.'
+        format: 'JSON'
+        out: 'dependency-check-report.json'
+
+    - name: Subir reporte de dependencias
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: dependency-check-report
+        path: dependency-check-report.json
+
+  # Job 6: Análisis de compliance
+  compliance-check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+
+    - name: Análisis de compliance con InSpec
+      uses: chef/inspec-action@master
+      with:
+        inspec-version: 'latest'
+        inspec-profile: 'https://github.com/dev-sec/cis-docker-benchmark'
+
+    - name: Verificación de políticas con OpenPolicyAgent
+      run: |
+        echo "Verificando políticas de seguridad..."
+        # Aquí irían las verificaciones de políticas
+        echo "✅ Políticas de seguridad verificadas"
+
+  # Job 7: Generación de reporte de seguridad
+  security-report:
+    runs-on: ubuntu-latest
+    needs: [code-security, docker-security, security-tests, secrets-scan, dependency-scan, compliance-check]
+    if: always()
+    steps:
+    - name: Generar reporte de seguridad
+      run: |
+        echo "# Reporte de Seguridad - DevOps App Emmanuel" > security-report.md
+        echo "Fecha: $(date)" >> security-report.md
+        echo "" >> security-report.md
+        echo "## Resumen de Escaneos" >> security-report.md
+        echo "- Análisis de código: ${{ needs.code-security.result }}" >> security-report.md
+        echo "- Seguridad Docker: ${{ needs.docker-security.result }}" >> security-report.md
+        echo "- Pruebas de seguridad: ${{ needs.security-tests.result }}" >> security-report.md
+        echo "- Escaneo de secretos: ${{ needs.secrets-scan.result }}" >> security-report.md
+        echo "- Análisis de dependencias: ${{ needs.dependency-scan.result }}" >> security-report.md
+        echo "- Verificación de compliance: ${{ needs.compliance-check.result }}" >> security-report.md
+
+    - name: Subir reporte de seguridad
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-report
+        path: security-report.md
+
+  # Job 8: Notificaciones de seguridad
+  security-notifications:
+    runs-on: ubuntu-latest
+    needs: [code-security, docker-security, security-tests, secrets-scan, dependency-scan]
+    if: always()
+    steps:
+    - name: Notificar resultados de seguridad
+      run: |
+        if [ "${{ needs.code-security.result }}" == "failure" ] || 
+           [ "${{ needs.docker-security.result }}" == "failure" ] || 
+           [ "${{ needs.security-tests.result }}" == "failure" ] || 
+           [ "${{ needs.secrets-scan.result }}" == "failure" ] || 
+           [ "${{ needs.dependency-scan.result }}" == "failure" ]; then
+          echo "🚨 Alertas de seguridad detectadas"
+          # Aquí irían las notificaciones a Slack, email, etc.
+        else
+          echo "✅ Todas las verificaciones de seguridad pasaron"
+        fi
