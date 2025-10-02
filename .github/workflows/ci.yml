@@ -33,9 +33,11 @@ jobs:
     - name: Ejecutar aplicación básica
       run: |
         python app.py &
+        APP_PID=$!
         sleep 5
         curl -f http://localhost:5000/api/health || echo "Health check falló"
-        pkill -f "python app.py" || true
+        kill $APP_PID 2>/dev/null || true
+        wait $APP_PID 2>/dev/null || true
         echo "✅ Aplicación ejecutada correctamente"
 
   # Job 2: Build Docker básico
