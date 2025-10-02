@@ -12,7 +12,7 @@ class TestDevOpsApp(unittest.TestCase):
         """Test que la página principal carga correctamente"""
         response = self.app.get('/')
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b'Emmanuel Rodríguez Valdés', response.data)
+        self.assertIn('Emmanuel Rodríguez Valdés', response.data.decode('utf-8'))
 
     def test_api_info(self):
         """Test del endpoint de información"""
